@@ -1,12 +1,14 @@
 import { Tree } from '@angular-devkit/schematics';
-import { SchematicTestRunner, UnitTestTree } from '@angular-devkit/schematics/testing';
+import {
+  SchematicTestRunner,
+  UnitTestTree,
+} from '@angular-devkit/schematics/testing';
 import * as path from 'path';
 
 describe('Template Migration 1.0.0', () => {
-  const collectionPath = path.join(__dirname, '../../../migration.json');
   let appTree: UnitTestTree;
 
-  it('should replace LetModule + LetDirective import specifier', async () => {
+  it('should replace LetModule + LetDirective module specifier', async () => {
     appTree = await setupTestFile(`
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
@@ -34,11 +36,14 @@ export class AppModule { }
       "import { LetModule, LetDirective } from '@rx-angular/template'"
     );
     expect(file).toContain(
-      "import { LetModule, LetDirective } from '@rx-angular/template/let'"
+      "import { LetModule } from '@rx-angular/template/let'"
+    );
+    expect(file).toContain(
+      "import { LetDirective } from '@rx-angular/template/let'"
     );
   });
 
-  it('should replace PushModule + PushPipe import specifier', async () => {
+  it('should replace PushModule + PushPipe module specifier', async () => {
     appTree = await setupTestFile(`
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
@@ -66,11 +71,14 @@ export class AppModule { }
       "import { PushModule, PushPipe } from '@rx-angular/template'"
     );
     expect(file).toContain(
-      "import { PushModule, PushPipe } from '@rx-angular/template/push'"
+      "import { PushModule } from '@rx-angular/template/push'"
+    );
+    expect(file).toContain(
+      "import { PushPipe } from '@rx-angular/template/push'"
     );
   });
 
-  it('should replace UnpatchModule + UnpatchDirective import specifier', async () => {
+  it('should replace UnpatchModule + UnpatchDirective module specifier', async () => {
     appTree = await setupTestFile(`
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
@@ -98,12 +106,56 @@ export class AppModule { }
       "import { UnpatchModule, UnpatchDirective } from '@rx-angular/template'"
     );
     expect(file).toContain(
-      "import { UnpatchModule, UnpatchDirective } from '@rx-angular/template/unpatch'"
+      "import { UnpatchModule } from '@rx-angular/template/unpatch'"
+    );
+    expect(file).toContain(
+      "import { UnpatchDirective } from '@rx-angular/template/unpatch'"
+    );
+  });
+
+  it('should replace all module specifiers', async () => {
+    appTree = await setupTestFile(`
+import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { LetModule, PushModule, UnpatchModule } from '@rx-angular/template';
+
+import { AppComponent } from './app.component';
+
+@NgModule({
+  declarations: [
+    AppComponent,
+  ],
+  imports: [
+    BrowserModule,
+    UnpatchModule
+  ],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }
+  `);
+
+    const file = appTree.readContent('app.module.ts');
+
+    expect(file).not.toContain(
+      "import { LetModule, PushModule, UnpatchModule } from '@rx-angular/template'"
+    );
+    expect(file).toContain(
+      "import { LetModule } from '@rx-angular/template/let'"
+    );
+    expect(file).toContain(
+      "import { PushModule } from '@rx-angular/template/push'"
+    );
+    expect(file).toContain(
+      "import { UnpatchModule } from '@rx-angular/template/unpatch'"
     );
   });
 
   function setupTestFile(fileInput: string, filePath = './app.module.ts') {
-    const runner = new SchematicTestRunner('schematics', collectionPath);
+    const runner = new SchematicTestRunner(
+      '@rx-angular/template',
+      path.join(__dirname, '../../../migration.json')
+    );
     const tree = new UnitTestTree(Tree.empty());
 
     tree.create(filePath, fileInput);

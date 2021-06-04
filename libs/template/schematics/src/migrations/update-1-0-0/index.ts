@@ -1,8 +1,10 @@
 import { Rule, Tree } from '@angular-devkit/schematics';
 import * as ts from 'typescript';
 
-import { commitChanges, createReplaceChange } from '../../common/utils/changes';
+import { findNodes } from '@nrwl/workspace';
+import { insert, insertImport } from '@nrwl/workspace/src/utils/ast-utils';
 import { visitTSSourceFiles } from '../../common/utils/visitors';
+import { createRemoveChange } from '../../common/utils/changes';
 
 const renames: Record<string, string> = {
   LetModule: '@rx-angular/template/let',
@@ -28,30 +30,31 @@ export default function (): Rule {
         return;
       }
 
-      const changes = updateTemplateImportSpecifiers(sourceFile, imports);
-      commitChanges(tree, sourceFile.fileName, changes);
+      const changes = updateTemplateImportDeclarations(sourceFile, imports);
+      insert(tree, sourceFile.fileName, changes);
     });
   };
 }
 
-function updateTemplateImportSpecifiers(
+function updateTemplateImportDeclarations(
   sourceFile: ts.SourceFile,
   imports: ts.ImportDeclaration[]
 ) {
   return imports
-    .map((importDeclaration) => {
-      const importSpecifierValue = (importDeclaration.importClause!
-        .namedBindings as ts.NamedImports).elements.map((importSpecifier) =>
-        importSpecifier.getText()
-      )[0];
-
-      return {
-        moduleSpecifier: importDeclaration.moduleSpecifier,
-        oldText: importDeclaration.moduleSpecifier.getText(),
-        text: `'${renames[importSpecifierValue]}'`,
-      };
+    .flatMap((importDeclaration) => {
+      const importSpecifiers = findNodes(
+        importDeclaration,
+        ts.SyntaxKind.ImportSpecifier
+      );
+      return importSpecifiers.map((importSpecifier) => ({
+        importDeclaration,
+        importSpecifier: importSpecifier.getText(),
+      }));
     })
-    .map(({ moduleSpecifier, oldText, text }) =>
-      createReplaceChange(sourceFile, moduleSpecifier, oldText, text)
-    );
+    .flatMap(({ importDeclaration, importSpecifier }) => {
+      return [
+        createRemoveChange(sourceFile, importDeclaration),
+        insertImport(sourceFile, sourceFile.fileName, importSpecifier, renames[importSpecifier])
+      ];
+    });
 }
